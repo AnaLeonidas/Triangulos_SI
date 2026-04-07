@@ -2,6 +2,7 @@ import networkx as nx
 import math
 import random
 import matplotlib.pyplot as plt
+from collections import deque # Adicionado para a fila da BFS
 
 def vertice_no_triangulo(vertice, v1, v2, v3):
     def sinal(p1, p2, p3):
@@ -58,6 +59,26 @@ def aresta_livre(p_inicio, p_fim, obstaculos):
                 return False
     return True
 
+# --- NOVA FUNÇÃO: BUSCA EM LARGURA ---
+def busca_em_largura(grafo, inicio, fim):
+    fila = deque([inicio])
+    visitados = {inicio: None} 
+
+    while fila:
+        atual = fila.popleft()
+        if atual == fim:
+            caminho = []
+            while atual is not None:
+                caminho.append(atual)
+                atual = visitados[atual]
+            return caminho[::-1]
+
+        for vizinho in grafo.neighbors(atual):
+            if vizinho not in visitados:
+                visitados[vizinho] = atual
+                fila.append(vizinho)
+    return None
+
 def criar_cenario(limite_x, limite_y, qtd_obstaculos, lado_tri):
     G = nx.Graph()
     inicio = (0, 0)
@@ -93,46 +114,49 @@ def criar_cenario(limite_x, limite_y, qtd_obstaculos, lado_tri):
             if aresta_livre(p1, p2, obstaculos_finalizados):
                 dist = math.hypot(p1[0]-p2[0], p1[1]-p2[1])
                 G.add_edge(p1, p2, weight=dist)
-                print(p1, p2)
 
     return G, inicio, destino, todos_vertices, obstaculos_finalizados
 
-LARGURA, ALTURA = 10, 10
-QUANTIDADE = 5
-LADO = 3
+# --- PARÂMETROS ---
+LARGURA, ALTURA = 100, 100
+QUANTIDADE = 100
+LADO = 7
 
 G, start, end, vertices_para_desenho, lista_triangulos = criar_cenario(LARGURA, ALTURA, QUANTIDADE, LADO)
 
+# EXECUTANDO A BUSCA
+caminho_encontrado = busca_em_largura(G, start, end)
+
 pos = {n: n for n in G.nodes()}
-
 plt.figure(figsize=(10, 10))
-
 plt.axvline(0, color='black', linewidth=1.2)
 plt.axhline(0, color='black', linewidth=1.2)
-
 plt.grid(True, which='both', linestyle='--', linewidth=0.5, color='gray', alpha=0.5)
 
+# 1. Desenha todas as arestas possíveis (em vermelho clarinho como estava)
 nx.draw_networkx_edges(G, pos, edge_color='tomato', alpha=0.4, width=1)
 
-nx.draw_networkx_nodes(G, pos, nodelist=vertices_para_desenho, node_color='orange', node_size=1)
+# 2. SE encontrar caminho, pinta de AZUL por cima
+if caminho_encontrado:
+    arestas_caminho = [(caminho_encontrado[i], caminho_encontrado[i+1]) for i in range(len(caminho_encontrado)-1)]
+    nx.draw_networkx_edges(G, pos, edgelist=arestas_caminho, edge_color='blue', width=3, label='Caminho Encontrado')
 
+nx.draw_networkx_nodes(G, pos, nodelist=vertices_para_desenho, node_color='orange', node_size=1)
 nx.draw_networkx_nodes(G, pos, nodelist=[start], node_color='green', node_size=150, label='Origem (0,0)')
-nx.draw_networkx_nodes(G, pos, nodelist=[end], node_color='blue', node_size=150, label='Destino')
+nx.draw_networkx_nodes(G, pos, nodelist=[end], node_color='blue', node_size=150, label=f'Destino ({LARGURA},{ALTURA})')
 
 for tri in lista_triangulos:
     polygon = plt.Polygon(tri, closed=True, facecolor='blue', edgecolor='navy', alpha=0.4)
     plt.gca().add_patch(polygon)
 
 qtd_gerada = len(lista_triangulos)
-plt.title(f"Grafo de Visibilidade: {qtd_gerada}/{QUANTIDADE} Obstáculos Triangulares Gerados", fontsize=14, fontweight='bold')
+plt.title(f"Grafo de Visibilidade: {qtd_gerada}/{QUANTIDADE} Obstáculos | BFS em Azul", fontsize=14, fontweight='bold')
 
 margem = 1
 plt.xlim(-margem, LARGURA + margem)
 plt.ylim(-margem, ALTURA + margem)
-
 plt.xlabel("Eixo X (Horizontal)", fontsize=12)
 plt.ylabel("Eixo Y (Vertical)", fontsize=12)
-
 plt.legend(loc='upper left')
 plt.tight_layout() 
 plt.show()
